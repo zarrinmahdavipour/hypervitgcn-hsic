@@ -217,7 +217,3 @@ Update Table~\ref{tab:cross_domain} in the LaTeX document with actual results.
 
 
 
-Acknowledgments
-This work was supported by [Your Funding Agency]. We thank the providers of the Indian Pines, PaviaU, Houston2013, and Botswana datasets.
-Contact
-For issues or questions, please open an issue on this repository or contact [Your Email].
