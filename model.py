@@ -1,3 +1,4 @@
+# model.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -5,6 +6,7 @@ from einops import rearrange
 import numpy as np
 
 class CNN3D(nn.Module):
+    # Existing code remains unchanged
     def __init__(self, in_channels, out_channels=64):
         super(CNN3D, self).__init__()
         self.conv1 = nn.Conv3d(in_channels, 32, kernel_size=(3, 3, 3), padding=1)
@@ -22,6 +24,7 @@ class CNN3D(nn.Module):
         return x
 
 class LightweightViT(nn.Module):
+    # Existing code remains unchanged
     def __init__(self, in_channels, patch_sizes=[5, 7, 9], num_heads=4, dim=64):
         super(LightweightViT, self).__init__()
         self.patch_sizes = patch_sizes
@@ -48,6 +51,7 @@ class LightweightViT(nn.Module):
         return x
 
 class AttentionGCN(nn.Module):
+    # Existing code remains unchanged
     def __init__(self, in_features, out_features):
         super(AttentionGCN, self).__init__()
         self.fc = nn.Linear(in_features, out_features)
@@ -63,22 +67,43 @@ class AttentionGCN(nn.Module):
         x = torch.matmul(adj, x)
         return x
 
+class DomainDiscriminator(nn.Module):
+    def __init__(self, in_features=64):
+        super(DomainDiscriminator, self).__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(in_features, 128),
+            nn.ReLU(),
+            nn.Linear(128, 2),  # Source vs. target domain
+            nn.Sigmoid()
+        )
+    
+    def forward(self, x):
+        x = x.mean(dim=1)  # Aggregate features across patches
+        return self.mlp(x)
+
 class HyperViTGCN(nn.Module):
-    def __init__(self, in_channels, num_classes, patch_sizes=[5, 7, 9], num_heads=4):
+    def __init__(self, in_channels, num_classes, patch_sizes=[5, 7, 9], num_heads=4, use_domain_adaptation=False):
         super(HyperViTGCN, self).__init__()
         self.cnn = CNN3D(in_channels, out_channels=64)
         self.vit = LightweightViT(64, patch_sizes, num_heads, dim=64)
         self.gcn = AttentionGCN(64, 64)
         self.fc = nn.Linear(64, num_classes)
+        self.use_domain_adaptation = use_domain_adaptation
+        if use_domain_adaptation:
+            self.discriminator = DomainDiscriminator(in_features=64)
     
-    def forward(self, x, adj):
+    def forward(self, x, adj, return_features=False):
         x = self.cnn(x)
-        x = self.vit(x)
-        x = self.gcn(x, adj)
-        x = self.fc(x.mean(dim=1))
-        return x
+        x_vit = self.vit(x)
+        x = self.gcn(x_vit, adj)
+        x_cls = self.fc(x.mean(dim=1))
+        if self.use_domain_adaptation and return_features:
+            x_domain = self.discriminator(x_vit)
+            return x_cls, x_domain
+        return x_cls
 
 def create_adjacency_matrix(x, k=10):
+    # Existing code remains unchanged
     x = x.view(x.size(0), -1)
     cos_sim = F.cosine_similarity(x.unsqueeze(1), x.unsqueeze(0), dim=-1)
     _, indices = torch.topk(cos_sim, k, dim=-1)
